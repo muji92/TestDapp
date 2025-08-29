@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TokenPocket TRX Transfer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: red;
+        }
+        .info {
+            color: green;
+        }
+        input {
+            padding: 8px;
+            margin: 10px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>TokenPocket TRX Transfer</h2>
+        <button id="connectButton">Connect TokenPocket</button>
+        <p id="status"></p>
+        <p id="address"></p>
+        <p id="balance"></p>
+        <div>
+            <input type="text" id="recipientAddress" placeholder="Recipient TRON Address">
+            <input type="number" id="amount" placeholder="Amount in TRX">
+            <button id="transferButton">Transfer TRX</button>
+        </div>
+        <p id="transactionStatus"></p>
+    </div>
+
+    <script>
+        // Function to check if TokenPocket is installed and connected
+        async function connectTokenPocket() {
+            const statusElement = document.getElementById('status');
+            const addressElement = document.getElementById('address');
+            const balanceElement = document.getElementById('balance');
+
+            // Check if TokenPocket (via tronWeb) is available
+            if (window.tronWeb && window.tronWeb.ready) {
+                try {
+                    // Verify TokenPocket wallet
+                    const isTokenPocket = window.tokenpocket || (window.tronWeb && window.tronWeb.isTokenPocket);
+                    if (!isTokenPocket) {
+                        throw new Error('Please use TokenPocket wallet.');
+                    }
+
+                    // Get the default address
+                    const address = window.tronWeb.defaultAddress.base58;
+                    statusElement.textContent = 'Connected to TokenPocket!';
+                    statusElement.className = 'info';
+                    addressElement.textContent = `Address: ${address}`;
+
+                    // Get balance
+                    const balance = await window.tronWeb.trx.getBalance(address);
+                    const balanceInTRX = window.tronWeb.fromSun(balance); // Convert from SUN to TRX
+                    balanceElement.textContent = `Balance: ${balanceInTRX} TRX`;
+                } catch (error) {
+                    statusElement.textContent = `Error: ${error.message}`;
+                    statusElement.className = 'error';
+                }
+            } else {
+                statusElement.textContent = 'TokenPocket is not installed or not logged in. Please install/login to TokenPocket.';
+                statusElement.className = 'error';
+            }
+        }
+
+        // Function to transfer TRX
+        async function transferTRX() {
+            const recipientAddress = document.getElementById('recipientAddress').value;
+            const amount = document.getElementById('amount').value;
+            const transactionStatus = document.getElementById('transactionStatus');
+
+            if (!recipientAddress || !amount) {
+                transactionStatus.textContent = 'Please enter a valid recipient address and amount.';
+                transactionStatus.className = 'error';
+                return;
+            }
+
+            if (!window.tronWeb || !window.tronWeb.ready) {
+                transactionStatus.textContent = 'TokenPocket wallet not connected.';
+                transactionStatus.className = 'error';
+                return;
+            }
+
+            try {
+                // Convert amount to SUN (1 TRX = 1,000,000 SUN)
+                const amountInSun = window.tronWeb.toSun(amount);
+                // Send transaction
+                const transaction = await window.tronWeb.trx.sendTransaction(recipientAddress, amountInSun);
+                transactionStatus.textContent = `Transaction successful! TxID: ${transaction.txid}`;
+                transactionStatus.className = 'info';
+
+                // Update balance after transfer
+                const address = window.tronWeb.defaultAddress.base58;
+                const balance = await window.tronWeb.trx.getBalance(address);
+                document.getElementById('balance').textContent = `Balance: ${window.tronWeb.fromSun(balance)} TRX`;
+            } catch (error) {
+                transactionStatus.textContent = `Transaction failed: ${error.message}`;
+                transactionStatus.className = 'error';
+            }
+        }
+
+        // Event listener for connect button
+        document.getElementById('connectButton').addEventListener('click', async () => {
+            if (window.tronWeb) {
+                try {
+                    // Request account access
+                    await window.tronWeb.request({ method: 'tron_requestAccounts' });
+                    connectTokenPocket();
+                } catch (error) {
+                    document.getElementById('status').textContent = `Connection failed: ${error.message}`;
+                    document.getElementById('status').className = 'error';
+                }
+            } else {
+                document.getElementById('status').textContent = 'Please install TokenPocket extension or use TokenPocket DApp browser.';
+                document.getElementById('status').className = 'error';
+            }
+        });
+
+        // Event listener for transfer button
+        document.getElementById('transferButton').addEventListener('click', transferTRX);
+
+        // Check connection on page load
+        window.addEventListener('load', () => {
+            setTimeout(connectTokenPocket, 1000); // Delay to ensure TokenPocket is injected
+        });
+    </script>
+</body>
+</html>
